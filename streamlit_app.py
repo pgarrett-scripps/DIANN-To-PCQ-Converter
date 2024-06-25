@@ -9,30 +9,32 @@ import plotly.graph_objs as go
 import statsmodels.stats.multitest as smm
 st.set_page_config(page_title='DIANN Output PCQ Converter')
 
-st.title('DIANN Output PCQ Converter')
-st.caption('This app converts DIANN output to PCQ format')
+with st.sidebar:
 
-csv_files = st.file_uploader('Upload a CSV file', type=['csv'], accept_multiple_files=True)
+    st.title('DIANN Output PCQ Converter')
+    st.caption('This app converts DIANN output to PCQ format')
 
-if not csv_files:
-    st.warning('Please upload at least one CSV file')
-    st.stop()
+    csv_files = st.file_uploader('Upload a CSV file', type=['csv'], accept_multiple_files=True)
 
-dfs = []
-for csv_file in csv_files:
-    df = pd.read_csv(csv_file, index_col=0)
-    dfs.append(df)
+    if not csv_files:
+        st.warning('Please upload at least one CSV file')
+        st.stop()
 
-df = pd.concat(dfs)
-file_names = df['File.Name'].unique()
+    dfs = []
+    for csv_file in csv_files:
+        df = pd.read_csv(csv_file, index_col=0)
+        dfs.append(df)
 
-group1_files = st.multiselect('Select group 1 files', file_names)
-remaining_files = [file for file in file_names if file not in group1_files]
-group2_files = st.multiselect('Select group 2 files', remaining_files)
+    df = pd.concat(dfs)
+    file_names = df['File.Name'].unique()
 
-if not group1_files or not group2_files:
-    st.warning('Please select at least one file for each group')
-    st.stop()
+    group1_files = st.multiselect('Select group 1 files', file_names)
+    remaining_files = [file for file in file_names if file not in group1_files]
+    group2_files = st.multiselect('Select group 2 files', remaining_files)
+
+    if not group1_files or not group2_files:
+        st.warning('Please select at least one file for each group')
+        st.stop()
 
 file_to_group = {file: 1 for file in group1_files}
 file_to_group.update({file: 2 for file in group2_files})
