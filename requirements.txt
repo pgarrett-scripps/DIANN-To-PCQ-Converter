@@ -3,4 +3,4 @@ pandas
 streamlit
 scipy
 statsmodels
-pltly
+plotly
