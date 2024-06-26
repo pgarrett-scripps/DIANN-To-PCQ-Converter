@@ -120,21 +120,23 @@ with t3:
     group1_index = int(st.selectbox(label='Select First Group', options=group_options))
     group2_index = int(st.selectbox(label='Select Second Group', options=group_options))
 
-    if not st.button('run'):
+    if group1_index == group2_index:
+        st.warning('Ensure groups are not the same')
         st.stop()
 
     # Handle missing values
     df = df.dropna(subset=[index_col, values_col, 'group'])
 
     pivot_table = df.pivot_table(index=index_col, columns='group', values=values_col, aggfunc=agg_func)
+    
+    with st.expander('Show Full pivot Table'):
+        st.dataframe(pivot_table)
 
     indexes_to_keep = list(set([group1_index, group2_index]))
-
     pivot_table = pivot_table[indexes_to_keep]
 
     # drop rows with missing values
     pivot_table = pivot_table.dropna()
-
 
     # Calculate p-values
     p_values = []
@@ -180,5 +182,3 @@ with t3:
 
     else:
         st.dataframe(pivot_table.iloc[selected_points], use_container_width=True)
-
-
