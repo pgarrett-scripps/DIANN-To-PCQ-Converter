@@ -1,3 +1,4 @@
+from collections import Counter
 import os
 import zipfile
 
@@ -7,7 +8,7 @@ import streamlit as st
 import scipy.stats as stats
 import plotly.graph_objs as go
 import statsmodels.stats.multitest as smm
-st.set_page_config(page_title='DIANN Output PCQ Converter')
+st.set_page_config(page_title='DIANN Output PCQ Converter', initial_sidebar_state='expanded')
 
 with st.sidebar:
 
@@ -28,16 +29,28 @@ with st.sidebar:
     df = pd.concat(dfs)
     file_names = df['File.Name'].unique()
 
-    group1_files = st.multiselect('Select group 1 files', file_names)
-    remaining_files = [file for file in file_names if file not in group1_files]
-    group2_files = st.multiselect('Select group 2 files', remaining_files)
+    group_type = st.selectbox(label='Grouping', options=['Manual Selection', 'Auto File Split'])
+    file_to_group = {}
+    missing_selection = False
+    if group_type == 'Manual Selection':
+        num_groups = st.number_input(label='Number of Groups', value=2)
 
-    if not group1_files or not group2_files:
-        st.warning('Please select at least one file for each group')
+        groups = {}
+        remaining_files = set(file_names)
+        for i in range(1, num_groups+1):
+            file_selection = st.multiselect(f'Select group {i} files', options=list(remaining_files), key=f'{i}_file_selection')
+            remaining_files = set.difference(remaining_files, file_selection)
+            file_to_group.update({file: i for file in file_selection})
+            if len(file_selection) == 0:
+                missing_selection = True
+    else:
+        num_groups = len(file_names)
+        for i, file in enumerate(file_names, 1):
+            file_to_group[file] = i
+
+    if missing_selection is True:
+        st.warning("Not all groups are filled out. Ensure that All groups have at least 1 file specified")
         st.stop()
-
-file_to_group = {file: 1 for file in group1_files}
-file_to_group.update({file: 2 for file in group2_files})
 
 # add sequential number to the dataframe
 df['PSM.ID'] = range(1, len(df) + 1)
@@ -49,25 +62,33 @@ df = df.dropna(subset=['group'])
 
 # set psm id to be indexed
 cols_to_keep = ['PSM.ID', 'Stripped.Sequence', 'Light/Heavy.Ratio', 'Quantity.Quality', 'Protein.Group']
-group1_df = df[df['group'] == 1][cols_to_keep].set_index('PSM.ID')
-group2_df = df[df['group'] == 2][cols_to_keep].set_index('PSM.ID')
 
-t1, t2, t3, t4 = st.tabs(['Download', 'Group 1', 'Group 2', 'Volcano Plot'])
+group_dfs = {}
+for i in range(1, num_groups+1):
+    group_dfs[i] = df[df['group'] == i][cols_to_keep].set_index('PSM.ID')
+
+t1, t2, t3 = st.tabs(['Download', 'Groups', 'Volcano Plot'])
 with t1:
 
     zip_name = st.text_input('Enter the name of the ZIP file', 'groups.zip')
-    c1, c2 = st.columns(2)
-    group1_name = c1.text_input('Enter the name of the group 1 file', 'group1.tsv')
-    group2_name = c2.text_input('Enter the name of the group 2 file', 'group2.tsv')
-
+    if group_type == 'Manual Selection':
+        group_names = {}
+        for i in range(1, num_groups+1):
+            group_names[i] = st.text_input(f'Enter the name of the group {i} file', f'group{i}.tsv')
+    else:
+        group_names = {}
+        for i in range(1, num_groups+1):
+            fname = os.path.basename(file_names[i-1])
+            fname = ''.join(fname.split('.')[0].split('/')[-1].split('\\')[-1])
+            group_names[i] = st.text_input(f'Enter the name of the group {i} file', f'{fname}.tsv')
+    
     try:
-        # Save the two dfs to files and then zip them together and have this as a download file (st.download_button)
-        group1_df.to_csv(group1_name, sep='\t')
-        group2_df.to_csv(group2_name, sep='\t')
+        for i in range(1, num_groups+1):
+            group_dfs[i].to_csv(group_names[i], sep='\t')
 
         with zipfile.ZipFile(zip_name, 'w') as zipf:
-            zipf.write(group1_name)
-            zipf.write(group2_name)
+            for i in range(1, num_groups+1):
+                zipf.write(group_names[i])
 
         with open(zip_name, 'rb') as f:
             st.download_button('Download ZIP', f, file_name=zip_name, type='primary', use_container_width=True)
@@ -75,38 +96,51 @@ with t1:
         st.error(f'An error occurred: {e}')
 
     finally:
-        # Cleanup the CSV files after zipping
-        os.remove(group1_name)
-        os.remove(group2_name)
+        for i in range(1, num_groups+1):
+            os.remove(group_names[i])
+
         # Cleanup the ZIP file after download
         os.remove(zip_name)
 
 with t2:
-    st.subheader('Group 1')
-    st.dataframe(group1_df, use_container_width=True)
+    for i in range(1, num_groups+1):
+        st.subheader(f'Group {i}')
+        for fname, j in file_to_group.items():
+            if i == j:
+                st.caption(fname)
+        st.dataframe(group_dfs[i], use_container_width=True)
 with t3:
-    st.subheader('Group 2')
-    st.dataframe(group2_df, use_container_width=True)
-with t4:
     st.subheader('Volcano Plot')
     c1, c2 = st.columns(2)
     index_col = c1.selectbox('Select index column', ['Modified.Sequence', 'Stripped.Sequence'], index=1)
     values_col = c2.selectbox('Select values column', ['Light/Heavy.Log2Ratio', 'Light/Heavy.Ratio'], index=0)
     agg_func = st.selectbox('Select aggregation function', ['mean', 'median'], index=0)
 
+    group_options = list(range(1, num_groups+1))
+    group1_index = int(st.selectbox(label='Select First Group', options=group_options))
+    group2_index = int(st.selectbox(label='Select Second Group', options=group_options))
+
+    if not st.button('run'):
+        st.stop()
+
     # Handle missing values
     df = df.dropna(subset=[index_col, values_col, 'group'])
 
     pivot_table = df.pivot_table(index=index_col, columns='group', values=values_col, aggfunc=agg_func)
 
+    indexes_to_keep = list(set([group1_index, group2_index]))
+
+    pivot_table = pivot_table[indexes_to_keep]
+
     # drop rows with missing values
     pivot_table = pivot_table.dropna()
+
 
     # Calculate p-values
     p_values = []
     for seq in pivot_table.index:
-        group1 = df[(df[index_col] == seq) & (df['group'] == 1)][values_col].dropna()
-        group2 = df[(df[index_col] == seq) & (df['group'] == 2)][values_col].dropna()
+        group1 = df[(df[index_col] == seq) & (df['group'] == group1_index)][values_col].dropna()
+        group2 = df[(df[index_col] == seq) & (df['group'] == group2_index)][values_col].dropna()
         t_stat, p_val = stats.ttest_ind(group1, group2)
         p_values.append(p_val)
 

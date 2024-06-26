@@ -1,19 +1,4 @@
-# 🌀 Spiral template
+# DIANN to PCQ fiel converter
 
-A simple Streamlit app that draws a spiral. 
-
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://basic-template.streamlit.app/)
-
-### How to run it on your own machine
-
-1. Install the requirements
-
-   ```
-   $ pip install -r requirements.txt
-   ```
-
-2. Run the app
-
-   ```
-   $ streamlit run streamlit_app.py
-   ```
+1) put DIANN results through DIANN-CPP-Quant App
+2) Upload results to this app
