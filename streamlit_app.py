@@ -113,7 +113,7 @@ with t1:
     
     try:
         for i in range(1, num_groups + 1):
-            group_dfs[i].to_csv(group_names[i], sep='\t')
+            group_dfs[i].drop(columns=['File.Name']).to_csv(group_names[i], sep='\t')
             summary_group_dfs[i].to_csv(summary_group_names[i], sep='\t')
 
             unique_files = group_dfs[i]['File.Name'].unique()
